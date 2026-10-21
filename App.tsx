@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import Svg, { Path, Rect } from 'react-native-svg';
+import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import MembersScreen from './src/screens/MembersScreen';
 import LoungeScreen from './src/screens/LoungeScreen';
 import ChatScreen from './src/screens/ChatScreen';
+import ChannelsScreen from './src/screens/ChannelsScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
 import { CallParticipant, User } from './src/types';
 
 const CURRENT_USER: User = { id: 'usr_1', name: 'Аня Крылова', username: 'anya_kr', avatarText: 'AK', role: 'owner', isOnline: true };
@@ -17,12 +19,16 @@ const ALL_USERS_DB: User[] = [
 ];
 
 export default function App() {
+  // Навигационный стейт между тремя главными вкладками: 'channels' | 'members' | 'profile'
+  const [currentScreen, setCurrentScreen] = useState<'channels' | 'members' | 'profile'>('channels');
+
   const [isCallActive, setIsCallActive] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isCallConnected, setIsCallConnected] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [activeParticipants, setActiveParticipants] = useState<CallParticipant[]>([]);
   const [speedText, setSpeedText] = useState('64 Кбит/с · 24мс');
+  
   const [isChatActive, setIsChatActive] = useState(false);
   const [activeChatRecipient, setActiveChatRecipient] = useState<User | null>(null);
 
@@ -32,8 +38,8 @@ export default function App() {
       interval = setInterval(() => {
         setSeconds((prev) => {
           const nextSec = prev + 1;
-          const mockKbps = Math.floor(60 + Math.random() * 12);
-          const mockPing = Math.floor(18 + Math.random() * 15);
+          const mockKbps = Math.floor(62 + Math.random() * 10);
+          const mockPing = Math.floor(19 + Math.random() * 12);
           setSpeedText(`${mockKbps} Кбит/с · ${mockPing}мс`);
           return nextSec;
         });
@@ -108,12 +114,53 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      <MembersScreen 
-        currentUserId={CURRENT_USER.id} 
-        onStartCall={handleStartCall} 
-        onOpenChat={handleOpenChat} 
-      />
+      {/* Контент текущего выбранного экрана */}
+      <View style={styles.screenWrapper}>
+        {currentScreen === 'channels' ? (
+          <ChannelsScreen 
+            onOpenCall={() => isCallActive ? setIsMinimized(false) : handleStartCall('usr_3')}
+            onOpenProfile={() => setCurrentScreen('profile')}
+          />
+        ) : currentScreen === 'members' ? (
+          <MembersScreen 
+            currentUserId={CURRENT_USER.id}
+            onStartCall={handleStartCall}
+            onOpenChat={handleOpenChat}
+          />
+        ) : (
+          <ProfileScreen 
+            onBackToChannels={() => setCurrentScreen('channels')}
+          />
+        )}
+      </View>
+
+      {/* Единый сквозной нижний Таб-бар для переключения вкладок */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity style={styles.tabItem} onPress={() => setCurrentScreen('channels')}>
+          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+            <Path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke={currentScreen === 'channels' ? '#8A56FF' : '#656469'} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          </Svg>
+        </TouchableOpacity>
+        
+        {/* Кнопка переключения на вашу вкладку ПОИСКА И СПИСКА УЧАСТНИКОВ */}
+        <TouchableOpacity style={styles.tabItem} onPress={() => setCurrentScreen('members')}>
+          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+            <Path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z" stroke={currentScreen === 'members' ? '#8A56FF' : '#656469'} strokeWidth={2} />
+          </Svg>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.tabItem}>
+          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+            <Path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" stroke="#656469" strokeWidth={2} strokeLinecap="round" />
+          </Svg>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.tabItem} onPress={() => setCurrentScreen('profile')}>
+          <View style={[styles.tabAvatar, currentScreen === 'profile' && styles.tabAvatarActive]}><Text style={styles.tabAvatarText}>AK</Text></View>
+        </TouchableOpacity>
+      </View>
       
+      {/* Чат модалка */}
       <ChatScreen 
         visible={isChatActive}
         recipient={activeChatRecipient}
@@ -124,6 +171,7 @@ export default function App() {
         }}
       />
 
+      {/* Окно активного вызова */}
       <LoungeScreen 
         visible={isCallActive && !isMinimized} 
         participants={activeParticipants}
@@ -137,10 +185,10 @@ export default function App() {
         onDisconnect={handleDisconnect} 
       />
 
+      {/* Плавающий мини-виджет свернутого звонка (доступен поверх всех трех вкладок) */}
       {isCallActive && isMinimized ? (
         <TouchableOpacity style={styles.miniWidget} onPress={() => setIsMinimized(false)}>
           <View style={styles.miniWidgetLeft}>
-            {/* SVG-Индикатор качества сигнала (вместо эмодзи антенны) */}
             <View style={styles.signalIconWrapper}>
               <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
                 <Rect x={2} y={16} width={3} height={5} rx={1} fill={isCallConnected ? '#00C853' : '#E6A23C'} />
@@ -172,10 +220,16 @@ export default function App() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F0E13' },
-  miniWidget: { position: 'absolute', bottom: 24, left: 16, right: 16, backgroundColor: '#1C1A24', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#2F2A3F', elevation: 5, zIndex: 9999 },
-  miniWidgetLeft: { flexDirection: 'row', alignItems: 'center' },
-  signalIconWrapper: { marginRight: 10, justifyContent: 'center', alignItems: 'center' },
-  widgetTitle: { color: '#FFF', fontWeight: '600', fontSize: 14 },
-  widgetMeta: { color: '#656469', fontSize: 11, marginTop: 2 },
-  widgetHangup: { backgroundColor: '#FF3B30', padding: 10, borderRadius: 20 },
+  screenWrapper: { flex: 1, paddingBottom: 60 },
+  tabBar: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, backgroundColor: '#121118', borderTopWidth: 1, borderTopColor: '#1A1920', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', zIndex: 999 },
+  tabItem: { padding: 12 },
+  tabAvatar: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#656469', justifyContent: 'center', alignItems: 'center' },
+  tabAvatarActive: { backgroundColor: '#8A56FF' },
+  tabAvatarText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
+miniWidget: { position: 'absolute', bottom: 76, left: 16, right: 16, backgroundColor: '#1C1A24', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#2F2A3F', elevation: 5, zIndex: 9999 },
+miniWidgetLeft: { flexDirection: 'row', alignItems: 'center' },
+signalIconWrapper: { marginRight: 10, justifyContent: 'center', alignItems: 'center' },
+widgetTitle: { color: '#FFF', fontWeight: '600', fontSize: 14 },
+widgetMeta: { color: '#656469', fontSize: 11, marginTop: 2 },
+widgetHangup: { backgroundColor: '#FF3B30', padding: 10, borderRadius: 20 },
 });
